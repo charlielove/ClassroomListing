@@ -4,7 +4,7 @@ function listClasses(){
   //charlielove.org tw: @charlie_love
   
   //open a new spreadsheet
-  var my_ss = "Classroom Assignments";
+  var my_ss = "Classroom Listing";
   var files = DriveApp.getFilesByName(my_ss);
   var file = !files.hasNext() ? SpreadsheetApp.create(my_ss) : files.next();
   var ss = SpreadsheetApp.openById(file.getId())
