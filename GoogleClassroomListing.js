@@ -45,7 +45,7 @@ function listClasses(){
   
   if(startRow == '') {
     sheet.clear();
-    sheet.appendRow(["No.","Class Owner","Organization","Creation Date","Course State","Course Section","Course Name"]);  
+    sheet.appendRow(["No.","Class Owner","Organization","Creation Date","Last Updated","Course State","Course Section","Course Name","Enrollment Code"]);  
     //start at row 0
     var startRow = 0;
     // it isn't set, start with an empty token
@@ -77,6 +77,7 @@ function listClasses(){
                  var courseCreation = courses.courses[i].creationTime;
                  var courseUpdated = courses.courses[i].updateTime;
                  var courseSection = courses.courses[i].section;
+                 var courseCode = courses.courses[i].enrollmentCode
                  if (courseSection == null) {
                      courseSection = "";
                  }
@@ -89,7 +90,7 @@ function listClasses(){
                     owner = ownerObj.name.fullName;
                     var ou = ownerObj.orgUnitPath;
     
-                    ss.getSheets()[0].appendRow([startRow+1,owner,ou,courseCreation,courseState,courseSection, courseName.toString()]);
+                    ss.getSheets()[0].appendRow([startRow+1,owner,ou,courseCreation,courseUpdated,courseState,courseSection, courseName.toString(),courseCode]);
                     startRow++;  //we've written a row, so add one to start row.
         
                     //write the row value into the sheet to read later 
@@ -112,7 +113,7 @@ function listClasses(){
     
     //we've run out of classrooms
     if ((nextPageToken == undefined)||(errorflag == true)){
-       endContinuousExecutionInstance(listClasses, "chalove@aberdeencity.gov.uk", "Classroom");
+       endContinuousExecutionInstance(listClasses, "yourEmailAddress", "Classroom");
     }
   
   
