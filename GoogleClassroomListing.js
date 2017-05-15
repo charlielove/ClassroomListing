@@ -5,6 +5,13 @@ function getFirstEmptyRow(sheet) {
   return (row);
 }
 
+
+//get the pageSize value to use in the sheet
+function getPageSize(sheet) {
+  var row = sheet.getRange("M1").getValue(); 
+  return (row);
+}
+
 Date.prototype.yyyymmdd = function() {
     var mm = this.getMonth() + 1; // getMonth() is zero-based
     var dd = this.getDate();
@@ -42,7 +49,7 @@ function listClasses(){
   
   //if we don't have a batch key set then we are at the start so clear the sheet, add the headings and set the start to the first row.
   var startRow = getFirstEmptyRow(sheet);
-  
+
   if(startRow == '') {
     sheet.clear();
     sheet.appendRow(["No.","Class Owner","Organization","Creation Date","Last Updated","Course State","Course Section","Course Name","Enrollment Code"]);  
@@ -55,13 +62,22 @@ function listClasses(){
     //let's get a page of results for classroom listings 
     //get the token we are using to resume the batches
     //this is the nextPageToken
-    var nextPageToken = getBatchKey("listClasses");   
+    var nextPageToken = getBatchKey("listClasses");
   }
+ 
+  //get the pageSizeValue stored in the sheet
+  var pageSizeValue = getPageSize(sheet);
+  //if it isn't set then start at 400
+  if (pageSizeValue == '') {
+    pageSizeValue = 400;
+    var cell = sheet.getRange("M1");
+    cell.setValue(pageSizeValue);
+  } 
  
   //and now we'll loop arround retrieving a batch of results, 
   //writing them to the spreadsheet and then getting the next batch etc.
   var errorflag = false;
-  var pageSizeValue = 400;
+  
   do {
     //get list of course details
     var optionalArgs = {
@@ -107,13 +123,16 @@ function listClasses(){
                }
                //let's set the pageSize to 1 and get the last few one at a time
                pageSizeValue = 1;
+               //write the pageSizeValue into the Sheet
+               var cell = sheet.getRange("M1");
+               cell.setValue(pageSizeValue);
       }
 
     } while ((nextPageToken != undefined) && (isTimeRunningOut("listClasses") != true) && (errorflag != true )); //and do this until there are no more pages of results to get
     
     //we've run out of classrooms
     if ((nextPageToken == undefined)||(errorflag == true)){
-       endContinuousExecutionInstance(listClasses, "yourEmailAddress", "Classroom");
+       endContinuousExecutionInstance(listClasses, "chalove@aberdeencity.gov.uk", "Classroom");
     }
   
   
@@ -239,7 +258,7 @@ function isTimeRunningOut(fname){
 */
 function enableNextTrigger_(fname) {
   var userProperties = PropertiesService.getUserProperties();
-  var nextTrigger = ScriptApp.newTrigger(fname).timeBased().after(7 * 60 * 1000).create();
+  var nextTrigger = ScriptApp.newTrigger(fname).timeBased().after(9 * 60 * 1000).create();
   var triggerId = nextTrigger.getUniqueId();
 
   userProperties.setProperty('GASCBL_' + fname, triggerId);
