@@ -132,7 +132,7 @@ function listClasses(){
     
     //we've run out of classrooms
     if ((nextPageToken == undefined)||(errorflag == true)){
-       endContinuousExecutionInstance(listClasses, "chalove@aberdeencity.gov.uk", "Classroom");
+       endContinuousExecutionInstance(listClasses, "YourEmailAddress", "Classroom");
     }
   
   
