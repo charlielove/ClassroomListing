@@ -103,7 +103,6 @@ function listClasses(){
   
   do {
     var batchWrite = [];
-    //var batchLength = 0;
     // get list of course details
     // use "fields" to narrow down the size of the request to the specific fields we actually want
     var optionalArgs = {
@@ -114,7 +113,6 @@ function listClasses(){
     try {
       var courses = Classroom.Courses.list(optionalArgs);
       var nextPageToken = courses.nextPageToken;
-      //batchLength = courses.courses.length;
       // loop round the result page
       // todo - get pageProgress for current pageToken, and continue from this point
       for ( var i= 0, len = courses.courses.length; i < len; i++) {
