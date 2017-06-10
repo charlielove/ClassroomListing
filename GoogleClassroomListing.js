@@ -1,17 +1,24 @@
-//get the first empty row in the sheet
-function getFirstEmptyRow(sheet) {
-  
-  var row = sheet.getRange("L1").getValue(); 
-  return (row);
+/*********************************
+* set your admin email adress here
+*/
+function getEmailRecipient() {
+  return "admin@yourdomain.com";
 }
 
+// consider using Cahce Service to store values and arrays?
+// https://stackoverflow.com/questions/7854573/exceeded-maximum-execution-time-in-google-apps-script
 
-//get the pageSize value to use in the sheet
-function getPageSize(sheet) {
-  var row = sheet.getRange("M1").getValue(); 
-  return (row);
+// get the pageSize value to use in the sheet
+function getPageSize(sheet) { 
+  return (sheet.getRange("M1").getValue());
 }
 
+// set the pageSize value to use in the sheet
+function setPageSize(value, sheet) {
+    sheet.getRange("M1").setValue(value);
+}
+
+// function for date format
 Date.prototype.yyyymmdd = function() {
     var mm = this.getMonth() + 1; // getMonth() is zero-based
     var dd = this.getDate();
@@ -22,122 +29,182 @@ Date.prototype.yyyymmdd = function() {
          ].join('');
 };
 
-
+// main function for listing courses
 function listClasses(){
 
-  //by Charlie Love
-  //charlielove.org tw: @charlie_love
-
-  //let fire up the batch execution of the script
+  // lets fire up the batch execution of the script
   startOrResumeContinousExecutionInstance("listClasses");
 
-  //open the spreadsheet
+  // open the spreadsheet
   var date = new Date();
   var dateString = date.yyyymmdd();
-
   var my_ss = dateString + "ClassroomListing";
   var files = DriveApp.getFilesByName(my_ss);
   var file = !files.hasNext() ? SpreadsheetApp.create(my_ss) : files.next();
   var ss = SpreadsheetApp.openById(file.getId())
-  try 
-  {
-     ss.setActiveSheet(ss.getSheetByName(my_sheet));
-  } catch (e){;} 
+  var sheet = ss.getSheets()[0];
   
-  //set the activeSheet
-  var sheet = ss.getActiveSheet();
+  // setup and rename needed sheets
+  // rename first sheet if not already renamed
+  try {
+    ss.setActiveSheet(ss.getSheetByName('ClassroomList'));
+  } catch (e) {
+    ss.renameActiveSheet('ClassroomList');
+  }
   
-  //if we don't have a batch key set then we are at the start so clear the sheet, add the headings and set the start to the first row.
-  var startRow = getFirstEmptyRow(sheet);
-
-  if(startRow == '') {
+  // create a second sheet for storing id:s that we already have "translated" into names
+  try {
+    ss.setActiveSheet(ss.getSheetByName('idToName'));
+  } catch (e) {
+    ss.insertSheet('idToName', 1);
+  }
+  var ownerSheet = ss.getSheetByName('idToName');
+  
+  // read from ownerSheet into an array
+  if (ownerSheet.getLastRow() != 0) {
+    var ownerArray = ownerSheet.getRange(1,1,ownerSheet.getLastRow(),3).getValues();
+  } else {
+    var ownerArray = [];
+  }
+  
+  // if we don't have a batch key set then we are at the start so clear the sheet
+  // add the headings and set the start to the first row.
+  var startRow = sheet.getLastRow();
+  if(startRow == 0) {
     sheet.clear();
-    sheet.appendRow(["No.","Class Owner","Organization","Creation Date","Last Updated","Course State","Course Section","Course Name","Enrollment Code"]);  
-    //start at row 0
-    var startRow = 0;
+    sheet.appendRow(["No.","Class Owner","Organization","Creation Date","Last Updated",
+                     "Course State","Course Section","Course Name","Enrollment Code","Course Id"]);  
     // it isn't set, start with an empty token
     var nextPageToken = '';
     setBatchKey("listClasses", nextPageToken);
   } else {
-    //let's get a page of results for classroom listings 
-    //get the token we are using to resume the batches
-    //this is the nextPageToken
+    // subtract one from startrow (adjust to header counting as one row)
+    startRow -= 1;
+    // get the token we are using to resume the batches
     var nextPageToken = getBatchKey("listClasses");
   }
  
-  //get the pageSizeValue stored in the sheet
+  // get the pageSizeValue stored in the sheet
   var pageSizeValue = getPageSize(sheet);
-  //if it isn't set then start at 400
+  // if it isn't set then start at 300
   if (pageSizeValue == '') {
-    pageSizeValue = 400;
-    var cell = sheet.getRange("M1");
-    cell.setValue(pageSizeValue);
-  } 
+    pageSizeValue = 300;
+    setPageSize(pageSizeValue, sheet);
+  }
+  
+  // if resuming the batch - we must add at least one row below all results
+  if (sheet.getLastRow() != 0) {
+    sheet.insertRowsAfter(sheet.getMaxRows(), 1);
+  }
  
-  //and now we'll loop arround retrieving a batch of results, 
-  //writing them to the spreadsheet and then getting the next batch etc.
+  // and now we'll loop arround retrieving a batch of results, 
+  // writing them to the spreadsheet and then getting the next batch etc.
   var errorflag = false;
   
   do {
-    //get list of course details
+    var batchWrite = [];
+    // get list of course details
+    // use "fields" to narrow down the size of the request to the specific fields we actually want
     var optionalArgs = {
       pageSize: pageSizeValue,
-      pageToken: nextPageToken
+      pageToken: nextPageToken,
+      fields: "nextPageToken,courses(id,name,ownerId,courseState,creationTime,updateTime,section,enrollmentCode)"
     };
-    try {   var courses = Classroom.Courses.list(optionalArgs);
-            var nextPageToken = courses.nextPageToken;
-  
-            //loop round
-            for ( var i= 0, len = courses.courses.length; i < len; i++) {
-                 var courseName =  courses.courses[i].name;
-                 var courseCreation = courses.courses[i].creationTime;
-                 var courseUpdated = courses.courses[i].updateTime;
-                 var courseSection = courses.courses[i].section;
-                 var courseCode = courses.courses[i].enrollmentCode
-                 if (courseSection == null) {
-                     courseSection = "";
-                 }
-                 var courseState = courses.courses[i].courseState;
-                 var owner = courses.courses[i].ownerId;
-      
-                 try{
-                    ownerObj = AdminDirectory.Users.get(owner);}
-                    catch(err){owner += ": " +err.message; }
-                    owner = ownerObj.name.fullName;
-                    var ou = ownerObj.orgUnitPath;
-    
-                    ss.getSheets()[0].appendRow([startRow+1,owner,ou,courseCreation,courseUpdated,courseState,courseSection, courseName.toString(),courseCode]);
-                    startRow++;  //we've written a row, so add one to start row.
+    try {
+      var courses = Classroom.Courses.list(optionalArgs);
+      var nextPageToken = courses.nextPageToken;
+      // loop round the result page
+      // todo - get pageProgress for current pageToken, and continue from this point
+      for ( var i= 0, len = courses.courses.length; i < len; i++) {
+        var courseName =  courses.courses[i].name;
+        var courseCreation = courses.courses[i].creationTime;
+        var courseUpdated = courses.courses[i].updateTime;
+        var courseSection = courses.courses[i].section;
+        if (courseSection == null) {
+            courseSection = "";
+        }
+        var courseCode = courses.courses[i].enrollmentCode
+        var courseId = courses.courses[i].id
+        var courseState = courses.courses[i].courseState;
+        var ownerId = courses.courses[i].ownerId;
         
-                    //write the row value into the sheet to read later 
-                    var cell = sheet.getRange("L1");
-                    cell.setValue(startRow);
-            }
-            setBatchKey("listClasses", nextPageToken); 
-            
-        } catch (e ){ //error thown because we've fewer classrooms than the page size
-               
-               //if the page size is already one then we've run out of classrooms
-               if (pageSizeValue == 1) {
-                 errorflag = true;
-               }
-               //let's set the pageSize to 1 and get the last few one at a time
-               pageSizeValue = 1;
-               //write the pageSizeValue into the Sheet
-               var cell = sheet.getRange("M1");
-               cell.setValue(pageSizeValue);
+        // check if we have a "stored" ownerId
+        var lookUp = ownerArray.filter(function(v,i) {
+          return v[0] === ownerId;
+        });
+        
+        var owner = "";
+        var ou = "";
+        
+        // if we get a hit through lookUp we can match the owner without an API call
+        if (lookUp[0]) {
+          owner = lookUp[0][1];
+          ou = lookUp[0][2];
+        } else {
+          try {
+            var ownerObj = AdminDirectory.Users.get(ownerId);
+            owner = ownerObj.name.fullName;
+            ou = ownerObj.orgUnitPath;
+            // push result to ownerArray
+            ownerArray.push([ownerId,owner,ou]);
+          } catch(err) { // if we get an error here - the owner might be deleted!
+            ou = "None";
+            owner = ownerId + " (" + err.message + ")";
+            ownerArray.push([ownerId,owner,ou]);
+          }
+        }
+        startRow++;
+        batchWrite.push([startRow,owner,ou,courseCreation,courseUpdated,
+                         courseState,courseSection,courseName.toString(),courseCode,courseId]);
       }
-
-    } while ((nextPageToken != undefined) && (isTimeRunningOut("listClasses") != true) && (errorflag != true )); //and do this until there are no more pages of results to get
-    
-    //we've run out of classrooms
-    if ((nextPageToken == undefined)||(errorflag == true)){
-       endContinuousExecutionInstance(listClasses, "YourEmailAddress", "Classroom");
-    }
+      // wait until loop finishes to write to the sheet,
+      // instead of writing each iteration
+      var row = sheet.getLastRow()+1;
+      var len = startRow + 1;
+      var range = "A" + row + ":J"+len;
+      sheet.getRange("L1").setValue(startRow);
+      sheet.getRange(range).setValues(batchWrite);
+      setBatchKey("listClasses", nextPageToken);
+      } catch (e) {
+        // Gradually slow things down - don't go to pageSize = 1 right away
+        if (pageSizeValue > 1) {
+          pageSizeValue /= 2;
+          pageSizeValue = parseInt(pageSizeValue);
+        }
+        
+        /* if the number of results don't match the page size, an error shouldn't occur,
+        *  but instead a corrupt classroom could cause an error like this -
+        *  indicating that your domain could have moore classsrooms that just can't be
+        *  listed until google resolves some bugs:
+        *  https://issuetracker.google.com/issues/36760244
+        */
+        // if we come down to a pageSizeValue of "1", and end up here - its an error, and we can quit!
+        if (pageSizeValue == 1) {
+          errorflag = true;
+        }
+        
+        // write the pageSizeValue into the Sheet
+        sheet.getRange("M1").setValue(pageSizeValue);
+      }
+    } while ((isTimeRunningOut("listClasses") != true) && (nextPageToken != undefined) && (errorflag != true ));
+    // and do this until there are no more pages of results to fetch
   
+  // empty ownerSheet and rewrite the ownerArray when we have run out of time
+  ownerSheet.clear();
+  var ownerLen = ownerArray.length;
+  var ownerRange =  "A1:C" + ownerLen;
+  if (ownerLen > ownerSheet.getMaxRows()) {
+    var addRows = ownerLen - ownerSheet.getMaxRows();
+    ownerSheet.insertRowsAfter(ownerSheet.getMaxRows(), addRows);
+  }  
+  ownerSheet.getRange(ownerRange).setValues(ownerArray);
   
+  // we've run out of classrooms
+  if ((nextPageToken == undefined)||(errorflag == true)){
+    var emailRecipient = getEmailRecipient();
+    endContinuousExecutionInstance("listClasses", emailRecipient, "Classroom");
+  }  
 }
-
 
 /**
  *  ---  Continous Execution Library ---
@@ -157,7 +224,6 @@ function listClasses(){
  *  limitations under the License.
  */
 
-
 /*************************************************************************
 * Call this function at the start of your batch script
 * it will create the necessary UserProperties with the fname
@@ -175,6 +241,8 @@ function startOrResumeContinousExecutionInstance(fname){
     start = new Date();
     userProperties.setProperty('GASCBL_' + fname + '_START_BATCH', start);
     userProperties.setProperty('GASCBL_' + fname + '_KEY', "");
+    // store the individual pageProgress
+    //userProperties.setProperty('GASCBL_' + fname + '_PROGRESS', 0);
   }
   
   userProperties.setProperty('GASCBL_' + fname + '_START_ITERATION', new Date());
@@ -208,7 +276,6 @@ function getBatchKey(fname){
   var userProperties = PropertiesService.getUserProperties();
   return userProperties.getProperty('GASCBL_' + fname + '_KEY');
 }
-
 
 /*************************************************************************
 * When the batch is complete run this function, and pass it an email and
@@ -248,8 +315,9 @@ function isTimeRunningOut(fname){
   var userProperties = PropertiesService.getUserProperties();
   var start = new Date(userProperties.getProperty('GASCBL_' + fname + '_START_ITERATION'));
   var now = new Date();
-  
   var timeElapsed = Math.floor((now.getTime() - start.getTime())/1000);
+  // uncomment to log how long each "page" takes to process:
+  //Logger.log(timeElapsed);
   return (timeElapsed > 270);
 }
 
@@ -258,9 +326,8 @@ function isTimeRunningOut(fname){
 */
 function enableNextTrigger_(fname) {
   var userProperties = PropertiesService.getUserProperties();
-  var nextTrigger = ScriptApp.newTrigger(fname).timeBased().after(9 * 60 * 1000).create();
+  var nextTrigger = ScriptApp.newTrigger(fname).timeBased().after(7 * 60 * 1000).create();
   var triggerId = nextTrigger.getUniqueId();
-
   userProperties.setProperty('GASCBL_' + fname, triggerId);
 }
 
