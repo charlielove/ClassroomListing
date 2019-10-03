@@ -2,7 +2,7 @@
 * set your admin email adress here
 */
 function getEmailRecipient() {
-  return "admin@yourdomain.com";
+  return "clove@ab-ed.org";
 }
 
 // consider using Cahce Service to store values and arrays?
@@ -72,7 +72,7 @@ function listClasses(){
   var startRow = sheet.getLastRow();
   if(startRow == 0) {
     sheet.clear();
-    sheet.appendRow(["No.","Class Owner","Organization","Creation Date","Last Updated",
+    sheet.appendRow(["No.","Class Owner","Primary Email","Organization","Creation Date","Last Updated",
                      "Course State","Course Section","Course Name","Enrollment Code","Course Id"]);  
     // it isn't set, start with an empty token
     var nextPageToken = '';
@@ -135,33 +135,36 @@ function listClasses(){
         
         var owner = "";
         var ou = "";
+        var email = "";
         
         // if we get a hit through lookUp we can match the owner without an API call
         if (lookUp[0]) {
           owner = lookUp[0][1];
-          ou = lookUp[0][2];
+          email = lookUp[0][2];          
+          ou = lookUp[0][3];
         } else {
           try {
             var ownerObj = AdminDirectory.Users.get(ownerId);
             owner = ownerObj.name.fullName;
+            email = ownerObj.primaryEmail;            
             ou = ownerObj.orgUnitPath;
             // push result to ownerArray
-            ownerArray.push([ownerId,owner,ou]);
+            ownerArray.push([ownerId,owner,email,ou]);
           } catch(err) { // if we get an error here - the owner might be deleted!
             ou = "None";
             owner = ownerId + " (" + err.message + ")";
-            ownerArray.push([ownerId,owner,ou]);
+            ownerArray.push([ownerId,owner,email,ou]);
           }
         }
         startRow++;
-        batchWrite.push([startRow,owner,ou,courseCreation,courseUpdated,
+        batchWrite.push([startRow,owner,email,ou,courseCreation,courseUpdated,
                          courseState,courseSection,courseName.toString(),courseCode,courseId]);
       }
       // wait until loop finishes to write to the sheet,
       // instead of writing each iteration
       var row = sheet.getLastRow()+1;
       var len = startRow + 1;
-      var range = "A" + row + ":J"+len;
+      var range = "A" + row + ":K"+len;
       sheet.getRange("L1").setValue(startRow);
       sheet.getRange(range).setValues(batchWrite);
       setBatchKey("listClasses", nextPageToken);
@@ -192,7 +195,7 @@ function listClasses(){
   // empty ownerSheet and rewrite the ownerArray when we have run out of time
   ownerSheet.clear();
   var ownerLen = ownerArray.length;
-  var ownerRange =  "A1:C" + ownerLen;
+  var ownerRange =  "A1:D" + ownerLen;
   if (ownerLen > ownerSheet.getMaxRows()) {
     var addRows = ownerLen - ownerSheet.getMaxRows();
     ownerSheet.insertRowsAfter(ownerSheet.getMaxRows(), addRows);
