@@ -2,7 +2,7 @@
 * set your admin email adress here
 */
 function getEmailRecipient() {
-  return "YOURADMINEMAIL";
+  return "admin@yourdomain.org";
 }
 
 // consider using Cahce Service to store values and arrays?
