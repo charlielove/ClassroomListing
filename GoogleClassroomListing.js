@@ -5,6 +5,20 @@
  * Blog: https://charlielove.org
  **/
 
+//function for the date
+Date.prototype.yyyymmdd = function() {
+    var mm = this.getMonth() + 1; // getMonth() is zero-based
+    var dd = this.getDate();
+
+    return [this.getFullYear(),
+        (mm > 9 ? '' : '0') + mm,
+        (dd > 9 ? '' : '0') + dd
+    ].join('');
+};
+
+/**
+ * Generates a list of all ACTIVE Google Classrooms with their creator teacher and OU path
+ */
 function listClasses() {
     //get setup. start with the date
     var now = new Date();
@@ -127,4 +141,5 @@ function listClasses() {
     sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
 
     Logger.log('Report spreadsheet created: %s', ss.getUrl());
+
 }
